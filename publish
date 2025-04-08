@@ -1,0 +1,92 @@
+"""
+重點理解：原生 REST API 發佈 .twbx 的關鍵點
+👉 REST API 的 publish workbook 方法
+POST /api/api-version/sites/site-id/workbooks?workbookType=twbx
+這裡有兩個關鍵點：
+"""
+
+1. workbookType=twbx
+這個一定要加，表示你傳上來的是 Tableau Packaged Workbook，也就是內含 Excel、CSV 等嵌入檔案的格式。
+
+如果沒指定，Tableau 預設會當成 .twb，這就是 Excel 為什麼消失的原因之一！
+
+2. multipart/form-data POST 結構
+你必須發一個 multipart/form-data 的 POST 請求，分為兩段：
+
+Part 1 — XML metadata
+這段定義 workbook 的資訊，格式如下：
+
+<tsRequest>
+  <workbook name="WorkbookName" showTabs="true">
+    <project id="your_project_id" />
+  </workbook>
+</tsRequest>
+Part 2 — binary file
+這段是你實際的 .twbx 檔案內容。
+
+正確做法範例（用原生 REST API 上傳 .twbx 並嵌入 Excel）
+以下是一個純 Python 使用 requests 套件發送 multipart POST 的範例：
+
+import requests
+
+# Tableau Server B 參數
+server_url = "https://your-serverB.com"
+api_version = "3.22"  # 根據你的版本調整
+site_id = "your-site-id"  # 如果是 default site 就設 ""
+token_name = "your-token-name"
+token_secret = "your-token-secret"
+project_id = "your-project-id"
+workbook_name = "yourWorkbook"
+twbx_path = "path/to/yourWorkbook.twbx"
+
+# 登入取得 token
+auth_payload = {
+    "credentials": {
+        "personalAccessTokenName": token_name,
+        "personalAccessTokenSecret": token_secret,
+        "site": {
+            "contentUrl": site_id
+        }
+    }
+}
+auth_res = requests.post(
+    f"{server_url}/api/{api_version}/auth/signin",
+    json=auth_payload
+)
+auth_data = auth_res.json()
+token = auth_data['credentials']['token']
+site_id = auth_data['credentials']['site']['id']
+
+# 準備 multipart 表單
+boundary = "----WebKitFormBoundary7MA4YWxkTrZu0gW"
+
+# Part 1: XML metadata
+xml_payload = f"""
+<tsRequest>
+  <workbook name="{workbook_name}" showTabs="true">
+    <project id="{project_id}" />
+  </workbook>
+</tsRequest>
+"""
+
+# 讀入 .twbx 檔案
+with open(twbx_path, 'rb') as f:
+    twbx_content = f.read()
+
+# 準備 multipart 格式
+multipart_data = {
+    'request_payload': (None, xml_payload, 'text/xml'),
+    'tableau_workbook': (twbx_path, twbx_content, 'application/octet-stream'),
+}
+
+# 發送 Publish Workbook 請求
+headers = {
+    'X-Tableau-Auth': token
+}
+
+publish_url = f"{server_url}/api/{api_version}/sites/{site_id}/workbooks?workbookType=twbx&overwrite=true"
+
+res = requests.post(publish_url, files=multipart_data, headers=headers)
+
+print("Status Code:", res.status_code)
+print("Response:", res.text)
