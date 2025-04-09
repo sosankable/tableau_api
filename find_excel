@@ -1,0 +1,67 @@
+import os
+import shutil
+import zipfile
+import xml.etree.ElementTree as ET
+
+TWBX_FILE = 'your_original.twbx'
+EXTRACT_DIR = 'extracted'
+FIXED_TWBX = 'fixed_output.twbx'
+
+with zipfile.ZipFile(TWBX_FILE, 'r') as z:
+    z.extractall(EXTRACT_DIR)
+    zip_entries = z.infolist()
+
+# 找出 .twb
+twb_name = next(f for f in os.listdir(EXTRACT_DIR) if f.endswith('.twb'))
+twb_path = os.path.join(EXTRACT_DIR, twb_name)
+
+# Parse TWB for Excel filenames
+tree = ET.parse(twb_path, parser=ET.XMLParser(encoding='utf-16'))
+root = tree.getroot()
+
+# 所有 twb 中用到的 Excel 檔名（含路徑）
+twb_excel_paths = []
+for conn in root.iter('connection'):
+    if conn.attrib.get('class') == 'excel-direct':
+        twb_excel_paths.append(conn.attrib['filename'])
+
+# 簡化成只留 Data 內檔名
+expected_excel_files = [os.path.basename(p) for p in twb_excel_paths]
+
+# 實際解壓出來的檔案（Data/）
+data_dir = os.path.join(EXTRACT_DIR, 'Data')
+actual_excel_files = []
+for f in os.listdir(data_dir):
+    if f.lower().endswith('.xlsx'):
+        actual_excel_files.append(f)
+
+# 比對：強制用順序與檔案大小猜測 mapping
+expected_full_paths = [os.path.join(data_dir, f) for f in expected_excel_files]
+actual_full_paths = [os.path.join(data_dir, f) for f in actual_excel_files]
+actual_sorted = sorted(actual_full_paths, key=lambda f: os.path.getsize(f))  # 用大小排序
+
+# 嘗試將亂碼檔案重新命名為正確名稱
+for target_path, source_path in zip(expected_full_paths, actual_sorted):
+    if not os.path.exists(target_path):
+        shutil.move(source_path, target_path)
+        print(f'[重命名] {source_path} → {target_path}')
+    else:
+        print(f'[已存在] {target_path}')
+
+# 修正 TWB 中的路徑，統一使用 Data/xxx.xlsx
+for conn in root.iter('connection'):
+    if conn.attrib.get('class') == 'excel-direct':
+        conn.set('filename', f'Data/{os.path.basename(conn.attrib["filename"])}')
+
+# 儲存修正後 TWB
+fixed_twb_path = os.path.join(EXTRACT_DIR, 'fixed.twb')
+tree.write(fixed_twb_path, encoding='utf-16', xml_declaration=True)
+
+# 壓縮回 TWBX
+with zipfile.ZipFile(FIXED_TWBX, 'w', zipfile.ZIP_DEFLATED) as z:
+    z.write(fixed_twb_path, arcname=twb_name)
+    for root_dir, _, files in os.walk(data_dir):
+        for f in files:
+            full_path = os.path.join(root_dir, f)
+            rel_path = os.path.relpath(full_path, EXTRACT_DIR)
+            z.write(full_path, arcname=rel_path)
