@@ -1,0 +1,56 @@
+import zipfile
+import os
+import shutil
+import xml.etree.ElementTree as ET
+
+TWBX_FILE = 'your_original.twbx'
+EXTRACT_DIR = 'extracted'
+FIXED_TWB = 'fixed.twb'
+FIXED_TWBX = 'final_output.twbx'
+
+# 解壓 twbx
+with zipfile.ZipFile(TWBX_FILE, 'r') as z:
+    z.extractall(EXTRACT_DIR)
+
+# 找出 .twb
+twb_path = next(f for f in os.listdir(EXTRACT_DIR) if f.endswith('.twb'))
+twb_full_path = os.path.join(EXTRACT_DIR, twb_path)
+
+# 讀取 .twb，修正所有 Excel 連線路徑
+tree = ET.parse(twb_full_path, parser=ET.XMLParser(encoding='utf-16'))
+root = tree.getroot()
+
+data_dir = os.path.join(EXTRACT_DIR, 'Data')
+os.makedirs(data_dir, exist_ok=True)
+
+excel_map = {}  # 原路徑 → 新路徑
+
+for conn in root.iter('connection'):
+    if conn.attrib.get('class') == 'excel-direct':
+        orig_path = conn.attrib['filename']
+        orig_filename = os.path.basename(orig_path)
+        new_path = f'Data/{orig_filename}'
+
+        # 先複製 Excel 檔案（原始在某中文路徑）
+        full_orig_path = os.path.join(EXTRACT_DIR, orig_path.replace('/', os.sep))
+        full_new_path = os.path.join(EXTRACT_DIR, 'Data', orig_filename)
+
+        if os.path.exists(full_orig_path):
+            shutil.copy(full_orig_path, full_new_path)
+            conn.set('filename', new_path)
+        else:
+            print(f'[警告] 找不到檔案: {full_orig_path}')
+
+# 儲存新的 .twb
+fixed_twb_path = os.path.join(EXTRACT_DIR, FIXED_TWB)
+tree.write(fixed_twb_path, encoding='utf-16', xml_declaration=True)
+
+# 壓回新的 .twbx
+with zipfile.ZipFile(FIXED_TWBX, 'w', zipfile.ZIP_DEFLATED) as z:
+    z.write(fixed_twb_path, arcname=twb_path)  # 保留原 .twb 名稱
+
+    for root_dir, _, files in os.walk(data_dir):
+        for f in files:
+            full_path = os.path.join(root_dir, f)
+            rel_path = os.path.relpath(full_path, EXTRACT_DIR)
+            z.write(full_path, arcname=rel_path)
