@@ -1,0 +1,13 @@
+#找出佔最多空間的資料夾
+sudo du -sh /var/* 2>/dev/null | sort -hr | head -20
+#看裡面哪個資料夾最大
+sudo du -sh /var/opt/tableau/* 2>/dev/null | sort -hr
+# 清掉老舊 log（不會影響 Tableau 功能）
+sudo find /var/opt/tableau/tableau_server/data/tabsvc/logs -type f -mtime +10 -exec rm -f {} \;
+#  清掉 crash dump、temp 檔（風險低）
+sudo rm -rf /var/tmp/*
+sudo rm -rf /var/opt/tableau/tableau_server/data/tabsvc/temp/*
+#  清掉 system log（非 Tableau 的）
+sudo journalctl --vacuum-time=7d
+# 看看空間是否已釋放
+df -h
