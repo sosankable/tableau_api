@@ -38,7 +38,11 @@ for f in os.listdir(data_dir):
 # 比對：強制用順序與檔案大小猜測 mapping
 expected_full_paths = [os.path.join(data_dir, f) for f in expected_excel_files]
 actual_full_paths = [os.path.join(data_dir, f) for f in actual_excel_files]
-actual_sorted = sorted(actual_full_paths, key=lambda f: os.path.getsize(f))  # 用大小排序
+actual_sorted = sorted(
+    actual_excel_files,
+    key=lambda f: (len(os.path.basename(f)), os.path.getsize(f))
+)
+  # 用大小排序
 
 # 嘗試將亂碼檔案重新命名為正確名稱
 for target_path, source_path in zip(expected_full_paths, actual_sorted):
