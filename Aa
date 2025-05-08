@@ -1,0 +1,79 @@
+import requests
+import xml.etree.ElementTree as ET
+
+# 基本參數
+server_url = 'https://your-tableau-server'
+site_id = 'your-site-id'  # 如果是Default站台，這裡填 ''
+workbook_id = 'your-workbook-id'
+system_username = 'system_db_user'
+system_password = 'system_db_pass'
+api_version = '3.22'  # 根據你的 Tableau 版本調整
+
+# Step 1️⃣ 登入取得 token
+auth_payload = {
+    'credentials': {
+        'name': 'your-api-username',
+        'password': 'your-api-password',
+        'site': {'contentUrl': site_id}
+    }
+}
+response = requests.post(
+    f"{server_url}/api/{api_version}/auth/signin",
+    json=auth_payload
+)
+response.raise_for_status()
+auth_data = response.json()
+token = auth_data['credentials']['token']
+site_id = auth_data['credentials']['site']['id']
+
+# 建立 headers
+headers = {
+    'X-Tableau-Auth': token
+}
+
+# Step 2️⃣ 查詢 workbook 的所有連線
+connections_resp = requests.get(
+    f"{server_url}/api/{api_version}/sites/{site_id}/workbooks/{workbook_id}/connections",
+    headers=headers
+)
+connections_resp.raise_for_status()
+connections_data = connections_resp.json()
+
+# 解析出連線 ID
+connections = connections_data.get('connections', {}).get('connection', [])
+
+print(f"找到 {len(connections)} 個連線，要修改帳號密碼...")
+
+# Step 3️⃣ 對每個連線更新帳號密碼
+for conn in connections:
+    connection_id = conn['id']
+    connection_type = conn['type']
+    print(f"更新 connection_id={connection_id}, type={connection_type}")
+
+    # 組出 XML body
+    xml_body = f"""
+    <tsRequest>
+        <connection>
+            <connectionCredentials name="{system_username}" password="{system_password}" embed="true"/>
+        </connection>
+    </tsRequest>
+    """.strip()
+
+    update_resp = requests.put(
+        f"{server_url}/api/{api_version}/sites/{site_id}/workbooks/{workbook_id}/connections/{connection_id}",
+        headers={**headers, 'Content-Type': 'application/xml'},
+        data=xml_body.encode('utf-8')
+    )
+
+    if update_resp.status_code == 200:
+        print(f"✅ 更新成功: connection_id={connection_id}")
+    else:
+        print(f"❌ 更新失敗: {update_resp.status_code} - {update_resp.text}")
+
+# Step 4️⃣ 登出
+requests.post(
+    f"{server_url}/api/{api_version}/auth/signout",
+    headers=headers
+)
+
+print("✅ 已完成全部更新並登出")
