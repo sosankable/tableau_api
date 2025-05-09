@@ -1,1 +1,20 @@
 <?xml version='1.0' encoding='UTF-8'?><tsResponse xmlns="http://tableau.com/api" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://tableau.com/api https://help.tableau.com/samples/en-us/rest_api/ts-api_3_9.xsd"><connections><connection id="AAAAAAAAA" type="sqlserver" embedPassword="true" serverAddress="bbbbbb" userName=""><datasource id="CCCCC" name="卡片基本樣貌"/></connection></connections></tsResponse>
+import xml.etree.ElementTree as ET
+
+# 假設 connections_resp 是前面那個 response
+xml_text = connections_resp.text
+
+# 解析 XML
+ns = {'t': 'http://tableau.com/api'}  # 定義命名空間
+root = ET.fromstring(xml_text)
+
+# 找到所有 <connection> 標籤
+connections = root.findall('.//t:connection', ns)
+
+print(f"找到 {len(connections)} 個 connection")
+
+# 印出每個 connection 的 id
+for conn in connections:
+    conn_id = conn.get('id')
+    conn_type = conn.get('type')
+    print(f"Connection ID: {conn_id}, Type: {conn_type}")
