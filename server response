@@ -18,3 +18,10 @@ for conn in connections:
     conn_id = conn.get('id')
     conn_type = conn.get('type')
     print(f"Connection ID: {conn_id}, Type: {conn_type}")
+
+-------------------------------
+xml_body: <tsRequest>
+                <connection>
+                    <connectionCredentials name="acct" password="pwd" embed="true"/>
+                </connection>
+            </tsRequest>
