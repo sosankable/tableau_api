@@ -69,3 +69,6 @@ with zipfile.ZipFile(FIXED_TWBX, 'w', zipfile.ZIP_DEFLATED) as z:
             full_path = os.path.join(root_dir, f)
             rel_path = os.path.relpath(full_path, EXTRACT_DIR)
             z.write(full_path, arcname=rel_path)
+
+"重命名 /tmp_workbook/transform/Data/2-7-21&τò░Φ│¬&Σ╕╗µÄ¿/IC20250322.xlsx -> /tmp_workbook/transform/Data/WITWO371-20241211.xlsx"
+"重命名 /tmp_workbook/transform/Data/2-7-21&τò░Φ│¬&Σ╕╗µÄ¿/WITWO371-20241211.xlsx -> /tmp_workbook/transform/Data/IC20250322.xlsx"
