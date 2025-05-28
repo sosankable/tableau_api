@@ -70,5 +70,45 @@ with zipfile.ZipFile(FIXED_TWBX, 'w', zipfile.ZIP_DEFLATED) as z:
             rel_path = os.path.relpath(full_path, EXTRACT_DIR)
             z.write(full_path, arcname=rel_path)
 
-"重命名 /tmp_workbook/transform/Data/2-7-21&τò░Φ│¬&Σ╕╗µÄ¿/IC20250322.xlsx -> /tmp_workbook/transform/Data/WITWO371-20241211.xlsx"
-"重命名 /tmp_workbook/transform/Data/2-7-21&τò░Φ│¬&Σ╕╗µÄ¿/WITWO371-20241211.xlsx -> /tmp_workbook/transform/Data/IC20250322.xlsx"
+----------------
+import os
+import difflib
+
+# 預期要配對的 Excel 檔案名稱（不含亂碼）
+expected_names = ["IC20250322.xlsx", "WITWO371-20241211.xlsx"]
+
+# 實際解壓出來的 Excel 檔路徑（亂碼）
+actual_excel_files = [
+    "/tmp_workbook/transform/Data/亂碼路徑1/16#&#+@@.xlsx",
+    "/tmp_workbook/transform/Data/亂碼路徑2/!!$@1234.xlsx"
+]
+
+# 找出實際路徑中的 basename
+actual_name_map = {os.path.basename(f): f for f in actual_excel_files}
+
+# 結果映射：{ 原始名稱 -> 實際路徑 }
+matched_map = {}
+
+used_actual_names = set()
+
+for expected in expected_names:
+    matches = difflib.get_close_matches(expected, actual_name_map.keys(), n=1, cutoff=0.1)
+    if matches:
+        matched_name = matches[0]
+        if matched_name not in used_actual_names:
+            matched_map[expected] = actual_name_map[matched_name]
+            used_actual_names.add(matched_name)
+        else:
+            print(f"⚠️ {expected} 找到的 {matched_name} 已被用過")
+    else:
+        print(f"⚠️ 找不到與 {expected} 類似的實際檔案")
+
+# 進行重命名（加中繼名稱避免衝突）
+for expected, actual_path in matched_map.items():
+    temp_path = actual_path + ".tmp"
+    final_path = os.path.join(os.path.dirname(actual_path), expected)
+
+    os.rename(actual_path, temp_path)
+    os.rename(temp_path, final_path)
+    print(f"✅ 重命名 {actual_path} → {final_path}")
+
